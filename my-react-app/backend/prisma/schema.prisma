@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+}
+
+enum IdeaStatus {
+  REVIEWING
+  APPROVED
+  FUNDING_ALLOCATED
+  ARCHIVED
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  password    String
+  role        Role      @default(EMPLOYEE)
+  department  String?
+  createdAt   DateTime  @default(now())
+
+  ideas       Idea[]
+  comments    Comment[]
+  votes       Vote[]
+}
+
+model Idea {
+  id                String        @id @default(uuid())
+  title             String
+  pitch             String                          // short description/pitch
+  estimatedBudget    Decimal       @db.Decimal(12, 2)
+  requiredTeamSize  Int
+  expectedImpact    String                          // expected impact/benefits
+  category          String?
+  priority          PriorityLevel @default(MEDIUM)
+  status            IdeaStatus    @default(REVIEWING)
+  submissionDate    DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  authorId          String
+  author            User          @relation(fields: [authorId], references: [id])
+
+  tags              IdeaTag[]
+  attachments       Attachment[]
+  comments          Comment[]
+  votes             Vote[]
+  insights          Insight[]
+
+  @@index([status])
+  @@index([priority])
+}
+
+model Tag {
+  id      String     @id @default(uuid())
+  name    String     @unique
+
+  ideas   IdeaTag[]
+}
+
+model IdeaTag {
+  ideaId  String
+  idea    Idea    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  tagId   String
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ideaId, tagId])
+}
+
+model Attachment {
+  id          String   @id @default(uuid())
+  fileName    String
+  fileUrl     String                      // path/URL to stored file
+  fileType    String?                     // e.g. "pdf", "image", "doc"
+  uploadedAt  DateTime @default(now())
+
+  ideaId      String
+  idea        Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  content     String
+  createdAt   DateTime @default(now())
+
+  ideaId      String
+  idea        Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+}
+
+model Vote {
+  id          String   @id @default(uuid())   // represents a "backing" of an idea
+  createdAt   DateTime @default(now())
+
+  ideaId      String
+  idea        Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([ideaId, userId])    // one backing per user per idea
+}
+
+model Insight {
+  id          String   @id @default(uuid())
+  content     String                      // AI-generated strategic insight text
+  type        String?                     // e.g. "trend_summary", "risk_assessment"
+  createdAt   DateTime @default(now())
+
+  ideaId      String?
+  idea        Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+}
